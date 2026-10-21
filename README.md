@@ -1,0 +1,76 @@
+# Майстерня — облік ремонтів
+
+React + Vite на GitHub Pages; Cloudflare Worker — API, перевірка паролів і робота з Google Sheets. Два користувачі: **Техносмарт**, **Vodafone**. Спільна база — ваша таблиця `129eSMvHB3zqnVAn2KFbArRPjXAE1xR_tr3TSMYcrHK0`.
+
+## Можливості
+
+Створення й редагування ремонтів; клієнт, телефон, модель, IMEI, опис, майстер, примітки; шість статусів; вартість та оплати; пошук і фільтр; огляд; експорт відфільтрованого журналу в CSV. Інтерфейс українською, адаптований до телефона. Демо зберігає приклади тільки в браузері, без синхронізації з таблицею.
+
+## Локальний запуск
+
+Встановіть Node.js 22 або новіший:
+
+```powershell
+npm install
+npm run dev
+```
+
+Без `.env` доступна демоверсія. Для API скопіюйте `.env.example` у `.env` і задайте URL розгорнутого Worker. Після зміни перезапустіть Vite.
+
+## 1. Google Sheets
+
+У Google Cloud створіть проєкт, увімкніть Google Sheets API, створіть service account і завантажте його JSON-ключ. Додайте `client_email` із ключа редактором вашої таблиці. Таблиця не повинна бути публічною.
+
+Вкладку **Repairs** уже підготовлено в наданій таблиці. Для іншої таблиці створіть окрему порожню вкладку **Repairs**. Наявні вкладки залиште без змін. API автоматично запише заголовки під час першого запиту:
+
+```text
+id | createdAt | client | phone | device | serial | issue | status | master | cost | paid | notes | updatedAt | updatedBy | version
+```
+
+Запис використовує RAW: введений текст не виконується як формула. Не змінюйте порядок колонок, ID та version і не сортуйте аркуш під час роботи програми. Редагуйте записи через програму: перевірка версій не захищає від ручних змін у Sheets. Кошторис не видаляється: завершені ремонти переводяться у «Видано».
+
+## 2. Cloudflare
+
+У `wrangler.toml` задайте `APP_URL` — повну адресу майбутнього GitHub Pages сайту з назвою репозиторію. ID таблиці вже встановлено. Для локальної розробки API змініть APP_URL на `http://localhost:5173/` і запускайте Vite з `--host localhost`; поверніть production URL перед публікацією.
+
+```powershell
+npx wrangler login
+node scripts/setup-users.mjs
+Get-Content -Raw .users-secret.local | npx wrangler secret put USERS_JSON
+Get-Content -Raw .session-secret.local | npx wrangler secret put SESSION_SECRET
+Get-Content -Raw 'C:\шлях\до\google-service-account.json' | npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_JSON
+npm run worker:deploy
+```
+
+Скрипт створює випадкові паролі для двох користувачів у `.passwords.local`. Відкрийте файл локально, передайте кожному лише його пароль. Зберігайте ключ Google поза репозиторієм. Файли `*.local`, `.env`, `.dev.vars` ігноруються Git. Не додавайте секрети у змінні з префіксом `VITE_`: вони потрапляють у відкриту збірку.
+
+Для зміни паролів повторно запустіть setup-users і завантажте USERS_JSON та SESSION_SECRET. Це змінить обидва паролі й завершить усі попередні сесії. Збережіть паролі у менеджері паролів, а локальні файли видаліть після налаштування.
+
+Worker використовує один Durable Object для послідовної обробки записів та обмеження спроб входу. Сама база ремонтів зберігається лише в Google Sheets. Перевірте доступність і ліміти Durable Objects для вашого Cloudflare-акаунта. Вхід обмежено 10 спробами за 15 хвилин на IP. Сесія дійсна 8 годин, токен зберігається в sessionStorage поточної вкладки. Вихід видаляє його з браузера; зміна SESSION_SECRET відкликає всі токени. Використовуйте HTTPS.
+
+## 3. GitHub Pages
+
+Створіть GitHub-репозиторій і завантажте цей проєкт у гілку `main`. У Settings → Pages → Source виберіть **GitHub Actions**. У Settings → Secrets and variables → Actions → Variables створіть **VITE_API_URL** з адресою Worker, наприклад `https://repair-api.example.workers.dev`.
+
+Готовий workflow `.github/workflows/pages.yml` тестує, збирає та публікує сайт при push у main. Він не розгортає Worker: це робиться окремо командою вище. Адреса сайту: `https://YOUR-LOGIN.github.io/YOUR-REPOSITORY/`. Точно таку саму адресу задайте в APP_URL. CORS дозволяє лише походження цього сайту, а кожен API-запит перевіряє підпис сесії та дозволеного користувача.
+
+## Перевірка підключення
+
+1. Увійдіть як Техносмарт та створіть тестовий ремонт.
+2. В іншому браузері увійдіть як Vodafone, натисніть оновлення і відкрийте ремонт.
+3. Змініть один запис в обох браузерах: друга застаріла зміна має повернути конфлікт. Закрийте картку, оновіть журнал і відкрийте її знову.
+4. Перевірте вкладку Repairs: дані, version та updatedBy мають змінитися.
+
+Автоматична синхронізація в реальному часі не реалізована: оновлення журналу виконується кнопкою і після збереження. Повторний POST після невизначеної мережевої помилки може створити дубль: спершу оновіть журнал. Резервні копії забезпечуйте історією версій Google Sheets та CSV-експортами.
+
+## Команди перевірки
+
+```powershell
+npm test
+npm run build
+npx wrangler deploy --dry-run
+```
+
+Публікація й реальна Google-синхронізація потребують ваших акаунтів, секретів і права доступу сервісного акаунта. Демо не підтверджує підключення до таблиці.
+
+Офіційні довідки: [Google Sheets API](https://developers.google.com/workspace/sheets/api/guides/values), [Cloudflare Durable Objects](https://developers.cloudflare.com/durable-objects/).

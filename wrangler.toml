@@ -1,0 +1,13 @@
+name = "repair-api"
+main = "worker/index.js"
+compatibility_date = "2026-10-01"
+[vars]
+APP_URL = "https://yemetsv.github.io/oblik-remontiv/"
+SPREADSHEET_ID = "129eSMvHB3zqnVAn2KFbArRPjXAE1xR_tr3TSMYcrHK0"
+SHEET_NAME = "Repairs"
+[[durable_objects.bindings]]
+name = "COORDINATOR"
+class_name = "Coordinator"
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Coordinator"]
