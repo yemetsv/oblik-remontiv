@@ -37,6 +37,17 @@ test('logout revokes token; logout-all revokes all own sessions only',async()=>{
  assert.equal((await call('/api/repairs',other)).status,200);
  assert.equal((await call('/api/repairs',await login('Техносмарт'))).status,200);
 });
+test('internal cost is manager-only, validated and preserved when a point edits',async()=>{
+ const {call,login,repairs}=await setup();const manager=await login('Менеджер'),point=await login('Техносмарт');
+ const update=await call('/api/repairs/aaaa',manager,'PUT',{...repairs[0],internalCost:65.25});
+ assert.equal(update.status,200);assert.equal((await update.json()).record.internalCost,65.25);
+ const listing=await(await call('/api/repairs',point)).json();const row=listing.rows[0];assert.equal(Object.hasOwn(row,'internalCost'),false);
+ assert.equal((await call('/api/repairs/aaaa',point,'PUT',{...row,internalCost:0})).status,403);
+ const saved=await call('/api/repairs/aaaa',point,'PUT',{...row,notes:'Point update'});assert.equal(saved.status,200);assert.equal(Object.hasOwn((await saved.json()).record,'internalCost'),false);
+ let current=(await(await call('/api/repairs',manager)).json()).rows.find(r=>r.id==='aaaa');assert.equal(Number(current.internalCost),65.25);
+ for(const value of [-1,'invalid',null,true,10000001])assert.equal((await call('/api/repairs/aaaa',manager,'PUT',{...current,internalCost:value})).status,400);
+ assert.equal((await call('/api/repairs/aaaa',manager,'PUT',{...current,internalCost:''})).status,200);
+});
 test('legacy, tampered, expired and changed-credential sessions are rejected',async()=>{
  const {call,login,env,accounts,store}=await setup();const token=await login('Техносмарт');
  assert.equal((await call('/api/repairs',token+'.bad')).status,401);

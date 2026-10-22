@@ -1,6 +1,6 @@
 export const statuses = ['Прийнято','Діагностика','У ремонті','Очікує запчастин','Готово','Видано'];
 export const branches = ['Техносмарт','Vodafone'];
-export const fields = ['id','createdAt','client','phone','device','serial','issue','status','master','cost','paid','notes','updatedAt','updatedBy','version','branch'];
+export const fields = ['id','createdAt','client','phone','device','serial','issue','status','master','cost','paid','notes','updatedAt','updatedBy','version','branch','internalCost'];
 export function validateRepair(x) {
  for(const k of ['client','phone','device','issue']) if(typeof x[k] !== 'string' || !x[k].trim() || x[k].length>2000) throw new Error('Заповніть клієнта, телефон, пристрій та несправність');
  if(!statuses.includes(x.status)) throw new Error('Невідомий статус');
@@ -8,4 +8,7 @@ export function validateRepair(x) {
  for(const k of ['serial','master','notes']) if(typeof x[k]!=='string'||x[k].length>5000) throw new Error('Некоректне текстове поле');
  return Object.fromEntries(['client','phone','device','serial','issue','status','master','cost','paid','notes'].map(k=>[k,['cost','paid'].includes(k)?Number(x[k]):x[k].trim()]));
 }
-export function csv(rows){return '\uFEFF'+[fields,...rows.map(r=>fields.map(k=>r[k]??''))].map(row=>row.map(v=>'"'+String(v).replace(/^[=+@\-\t\r]/,"'$&").replaceAll('"','""')+'"').join(';')).join('\r\n');}
+export function csv(rows,manager=false){const columns=manager?[...fields,'grossProfit']:fields.filter(f=>f!=='internalCost');rows=rows.map(r=>({...r,grossProfit:r.internalCost!==''&&r.internalCost!==undefined?Math.round((Number(r.cost)-Number(r.internalCost))*100)/100:''}));return '\uFEFF'+[columns,...rows.map(r=>columns.map(k=>r[k]??''))].map(row=>row.map(v=>'"'+String(v).replace(/^[=+@\-\t\r]/,"'$&").replaceAll('"','""')+'"').join(';')).join('\r\n');}
+
+export function internalCostValue(value){if(value==='')return '';if(!['number','string'].includes(typeof value)||!String(value).trim()||!Number.isFinite(Number(value))||Number(value)<0||Number(value)>10000000)throw new Error('Некоректна собівартість');return Math.round(Number(value)*100)/100;}
+export function grossProfit(r){return r.internalCost!==''&&r.internalCost!==undefined?Math.round((Number(r.cost)-Number(r.internalCost))*100)/100:null;}
