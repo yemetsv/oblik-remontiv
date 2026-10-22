@@ -1,5 +1,6 @@
 export const statuses = ['Прийнято','Діагностика','У ремонті','Очікує запчастин','Готово','Видано'];
-export const fields = ['id','createdAt','client','phone','device','serial','issue','status','master','cost','paid','notes','updatedAt','updatedBy','version'];
+export const branches = ['Техносмарт','Vodafone'];
+export const fields = ['id','createdAt','client','phone','device','serial','issue','status','master','cost','paid','notes','updatedAt','updatedBy','version','branch'];
 export function validateRepair(x) {
  for(const k of ['client','phone','device','issue']) if(typeof x[k] !== 'string' || !x[k].trim() || x[k].length>2000) throw new Error('Заповніть клієнта, телефон, пристрій та несправність');
  if(!statuses.includes(x.status)) throw new Error('Невідомий статус');
