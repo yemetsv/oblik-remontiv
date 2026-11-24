@@ -73,3 +73,15 @@ test('login rejects oversized and invalid JSON bodies',async()=>{
   const response=await obj.fetch(new Request('https://test/auth/login',{method:'POST',body}));assert.equal(response.status,status);
  }
 });
+
+test('Technosmart keeps its existing password and repair location',async()=>{
+ const {call,env,accounts}=await setup();
+ for(const login of ['Technosmart','Техносмарт']){
+  const response=await call('/auth/login','','POST',{login,password:'test-password'});assert.equal(response.status,200);
+  const data=await response.json();assert.equal(data.user.login,'Technosmart');assert.equal(data.user.branch,'Техносмарт');
+  const listing=await(await call('/api/repairs',data.token)).json();assert.deepEqual(listing.rows.map(r=>r.id),['aaaa']);
+ }
+ accounts[0].login='Technosmart';env.USERS_JSON=JSON.stringify(accounts);
+ const signed=await(await call('/auth/login','','POST',{login:'Technosmart',password:'test-password'})).json();
+ const rows=await(await call('/api/repairs',signed.token)).json();assert.equal(rows.rows[0].branch,'Техносмарт');
+});
