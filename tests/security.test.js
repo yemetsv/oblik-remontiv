@@ -56,3 +56,20 @@ test('legacy, tampered, expired and changed-credential sessions are rejected',as
  const fresh=await login('Техносмарт');accounts[0].hash='changed';env.USERS_JSON=JSON.stringify(accounts);
  assert.equal((await call('/api/repairs',fresh)).status,401);
 });
+
+test('account throttling blocks distributed password guessing and keeps other accounts usable',async()=>{
+ const {obj,call}=await setup();
+ for(let i=0;i<10;i++){
+  const response=await obj.fetch(new Request('https://test/auth/login',{method:'POST',headers:{'CF-Connecting-IP':'test-'+i},body:JSON.stringify({login:i%2?' ТЕХНОСМАРТ ':'Техносмарт',password:'wrong-password'})}));
+  assert.equal(response.status,401);
+ }
+ assert.equal((await call('/auth/login','','POST',{login:'Техносмарт',password:'test-password'})).status,429);
+ assert.equal((await call('/auth/login','','POST',{login:'Vodafone',password:'test-password'})).status,200);
+});
+
+test('login rejects oversized and invalid JSON bodies',async()=>{
+ const {obj}=await setup();
+ for(const [body,status]of [['x'.repeat(4097),413],['null',400],['{',400]]){
+  const response=await obj.fetch(new Request('https://test/auth/login',{method:'POST',body}));assert.equal(response.status,status);
+ }
+});
